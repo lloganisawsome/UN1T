@@ -7,6 +7,7 @@
   - anonymous sessions
   - browser/device/screen info
   - clicks on links/buttons/onclick elements
+  - JavaScript errors and unhandled promise rejections
 
   Does NOT capture:
   - form field values
@@ -73,10 +74,40 @@ async function boot() {
     (event) => {
       const click = getClickMeta(event.target);
       if (!click) return;
-      record(db, "click", { visitorId, session, startedAt, click });
+      record(db, "click", { visitorId, session, startedAt, click }).catch(() => {});
     },
     true
   );
+
+  window.addEventListener("error", (event) => {
+    record(db, "error", {
+      visitorId,
+      session,
+      startedAt,
+      error: {
+        kind: "window.error",
+        message: clean(event.message, 240),
+        source: clean(event.filename, 220),
+        line: Number(event.lineno || 0),
+        column: Number(event.colno || 0),
+        stack: clean(event.error?.stack, 900)
+      }
+    }).catch(() => {});
+  });
+
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event.reason;
+    record(db, "error", {
+      visitorId,
+      session,
+      startedAt,
+      error: {
+        kind: "unhandledrejection",
+        message: clean(reason?.message || reason, 240),
+        stack: clean(reason?.stack, 900)
+      }
+    }).catch(() => {});
+  });
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
@@ -90,13 +121,14 @@ async function record(db, type, extra) {
     ...basePayload(extra.visitorId, extra.session),
     type,
     click: extra.click || null,
+    error: extra.error || null,
     createdAt: serverTimestamp(),
     clientTime: new Date().toISOString()
   };
 
   await push(ref(db, `${BASE}/events`), payload);
   await writeSession(db, extra.visitorId, extra.session, extra.startedAt, type);
-  await writeCounters(db, type);
+  await writeCounters(db, type, extra);
 }
 
 async function writeSession(db, visitorId, session, startedAt, lastEventType) {
@@ -110,7 +142,7 @@ async function writeSession(db, visitorId, session, startedAt, lastEventType) {
   });
 }
 
-async function writeCounters(db, type) {
+async function writeCounters(db, type, extra = {}) {
   const today = new Date().toISOString().slice(0, 10);
   const pageKey = clean(currentPath().replace(/[.#$/[\]]/g, "_"), 120) || "home";
   const updates = {
@@ -134,6 +166,18 @@ async function writeCounters(db, type) {
     updates[`${BASE}/summary/allTime/clicks`] = increment(1);
     updates[`${BASE}/summary/bySite/${siteId}/clicks`] = increment(1);
     updates[`${BASE}/summary/daily/${today}/${siteId}/clicks`] = increment(1);
+
+    if (extra.click?.isPhantomGroupLink) {
+      updates[`${BASE}/summary/allTime/plGroupClicks`] = increment(1);
+      updates[`${BASE}/summary/bySite/${siteId}/plGroupClicks`] = increment(1);
+      updates[`${BASE}/summary/daily/${today}/${siteId}/plGroupClicks`] = increment(1);
+    }
+  }
+
+  if (type === "error") {
+    updates[`${BASE}/summary/allTime/errors`] = increment(1);
+    updates[`${BASE}/summary/bySite/${siteId}/errors`] = increment(1);
+    updates[`${BASE}/summary/daily/${today}/${siteId}/errors`] = increment(1);
   }
 
   await update(ref(db), updates);
@@ -162,6 +206,13 @@ function basePayload(visitorId, session) {
 function getClickMeta(target) {
   const el = target?.closest?.("a,button,label,[role='button'],[onclick],[data-analytics]");
   if (!el) return null;
+  const href = clean(el.tagName === "A" ? el.getAttribute("href") : "", 220);
+  const dataAnalytics = clean(el.getAttribute("data-analytics"), 80);
+  const classes = clean(el.className, 120);
+  const isPhantomGroupLink =
+    dataAnalytics === "pl-group-link" ||
+    /phantomlabs\.snproductions\.us/i.test(href) ||
+    /\bphantom-(sidebar|top)-link\b/.test(classes);
 
   const label = clean(
     el.getAttribute("aria-label") ||
@@ -177,9 +228,11 @@ function getClickMeta(target) {
   return {
     tag: clean(el.tagName, 20),
     id: clean(el.id, 80),
-    classes: clean(el.className, 120),
+    classes,
+    dataAnalytics,
     label,
-    href: clean(el.tagName === "A" ? el.getAttribute("href") : "", 220)
+    href,
+    isPhantomGroupLink
   };
 }
 
