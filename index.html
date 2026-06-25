@@ -1767,5 +1767,53 @@ renderGrid();
 // ESC to close
 document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
 </script>
+
+<!-- ===== PHANTOM LABS GROUP FOOTER ===== -->
+<div style="
+  background: #000;
+  border-top: 1px solid rgba(57,255,20,.08);
+  padding: 1.6rem 1.5rem;
+  text-align: center;
+  font-family: 'DM Sans', 'Rajdhani', sans-serif;
+">
+  <div style="
+    display: inline-flex;
+    align-items: center;
+    gap: .55rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  ">
+    <span style="
+      font-family: 'Rajdhani', sans-serif;
+      font-size: .68rem;
+      font-weight: 600;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.22);
+    ">This website is a part of</span>
+    <a href="https://phantomlabs.snproductions.us" target="_blank" rel="noopener noreferrer" style="
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      text-decoration: none;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #39ff14;
+      transition: text-shadow .3s, color .3s;
+    " onmouseover="this.style.textShadow='0 0 12px rgba(57,255,20,.6)'" onmouseout="this.style.textShadow='none'">
+      <svg width="14" height="14" viewBox="0 0 100 100" fill="none" style="flex-shrink:0;">
+        <circle cx="50" cy="50" r="45" fill="none" stroke="#39ff14" stroke-width="6" opacity=".5"/>
+        <circle cx="50" cy="50" r="28" fill="#39ff14" opacity=".18"/>
+        <circle cx="50" cy="50" r="12" fill="#39ff14" opacity=".5"/>
+      </svg>
+      Phantom Labs Group
+      <span style="font-size:.6rem;opacity:.45;">↗</span>
+    </a>
+  </div>
+</div>
+<!-- ===== END PHANTOM LABS GROUP FOOTER ===== -->
 </body>
 </html>
